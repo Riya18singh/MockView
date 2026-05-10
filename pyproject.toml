@@ -5,6 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    "channels>=4.2.2",
+    "channels-redis>=4.2.1",
+    "daphne>=4.1.2",
     "django>=4.2.30",
     "django-cors-headers>=4.4.0",
     "djangorestframework>=3.15.2",
@@ -13,4 +16,5 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "python-dotenv>=1.0.1",
     "requests>=2.32.4",
+    "websockets>=13.1",
 ]
