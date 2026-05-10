@@ -7,7 +7,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
     path('api/interviews/', include('interviews.urls')),
-    path('api/agents/', include('agents.urls')),  # ← Add this
+    path('api/agents/', include('agents.urls')),
+    path('api/reports/', include('reports.urls')),  # ← Add this
 ]
 
 urlpatterns += static(
