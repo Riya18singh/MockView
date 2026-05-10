@@ -12,4 +12,9 @@ urlpatterns = [
         views.SendMessageView.as_view(),
         name='send-message'
     ),
+    path(
+        'resume/parse/',
+        views.ParseResumeView.as_view(),
+        name='parse-resume'
+    ),
 ]

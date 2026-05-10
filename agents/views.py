@@ -1,3 +1,4 @@
+from .resume_parser import process_resume
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -43,10 +44,6 @@ def get_conversation_history(session):
 
 
 class StartInterviewView(APIView):
-    """
-    Called when user starts interview.
-    AI sends first message/introduction.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
@@ -62,7 +59,6 @@ class StartInterviewView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check if already has messages
         if session.messages.exists():
             return Response(
                 {'error': 'Interview already started'},
@@ -72,7 +68,6 @@ class StartInterviewView(APIView):
         session_config = get_session_config(session)
         user_profile = get_user_profile(request.user)
 
-        # Get opening message from AI
         opening_message = get_interviewer_response(
             session_config=session_config,
             user_profile=user_profile,
@@ -80,7 +75,6 @@ class StartInterviewView(APIView):
             last_score=None
         )
 
-        # Save AI message to DB
         Message.objects.create(
             session=session,
             role='interviewer',
@@ -95,14 +89,6 @@ class StartInterviewView(APIView):
 
 
 class SendMessageView(APIView):
-    """
-    Candidate sends answer.
-    1. Save candidate message
-    2. Evaluate the answer
-    3. Get next question from AI
-    4. Save AI message
-    5. Return everything
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
@@ -126,19 +112,16 @@ class SendMessageView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check interview not finished
         if session.questions_asked >= session.total_questions:
             return Response(
                 {'error': 'Interview is complete'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get last interviewer question
         last_question = session.messages.filter(
             role='interviewer'
         ).last()
 
-        # Evaluate candidate answer
         evaluation = None
         if last_question:
             evaluation = evaluate_answer(
@@ -148,8 +131,7 @@ class SendMessageView(APIView):
                 difficulty=session.difficulty
             )
 
-        # Save candidate message with score
-        candidate_msg = Message.objects.create(
+        Message.objects.create(
             session=session,
             role='candidate',
             content=candidate_message,
@@ -157,15 +139,12 @@ class SendMessageView(APIView):
             feedback=evaluation['feedback'] if evaluation else None
         )
 
-        # Update question count
         session.questions_asked += 1
         session.save()
 
-        # Get next question from AI
         session_config = get_session_config(session)
         user_profile = get_user_profile(request.user)
         conversation_history = get_conversation_history(session)
-
         last_score = evaluation['score'] if evaluation else None
 
         next_question = get_interviewer_response(
@@ -175,7 +154,6 @@ class SendMessageView(APIView):
             last_score=last_score
         )
 
-        # Save AI response
         Message.objects.create(
             session=session,
             role='interviewer',
@@ -191,4 +169,33 @@ class SendMessageView(APIView):
             'questions_asked': session.questions_asked,
             'total_questions': session.total_questions,
             'interview_complete': session.questions_asked >= session.total_questions
+        })
+
+
+class ParseResumeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        if not user.resume:
+            return Response(
+                {'error': 'Please upload a resume first'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = process_resume(user)
+
+        if 'error' in result:
+            return Response(
+                result,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({
+            'message': 'Resume parsed successfully',
+            'skills_extracted': result['skills'],
+            'projects_found': result['projects'],
+            'education': result['education'],
+            'summary': result['summary'],
         })
