@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Interview</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f4f4f4; }
+        #chat { height: 400px; overflow-y: auto; background: white; padding: 15px; border: 1px solid #ccc; margin-bottom: 10px; }
+        .msg { padding: 10px; margin: 5px 0; border-radius: 5px; }
+        .ai { background: #e3f2fd; }
+        .user { background: #d4edda; text-align: right; }
+        input { width: 80%; padding: 10px; }
+        button { padding: 10px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Interview Room</h2>
+    <button id="startBtn" onclick="start()">Begin Interview</button>
+    <div id="chat"></div>
+    <input type="text" id="answer" placeholder="Type answer...">
+    <button onclick="send()">Send</button>
+
+    <script>
+        const wsUrl = `ws://${window.location.host}/ws/interview/{{ session_id }}/?token={{ access_token }}`;
+        const ws = new WebSocket(wsUrl);
+        const chat = document.getElementById('chat');
+
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'interviewer_message') {
+                chat.innerHTML += `<div class="msg ai"><b>AI:</b> ${data.message}</div>`;
+            } else if (data.type === 'evaluation_result') {
+                chat.innerHTML += `<div class="msg ai"><i>Score: ${data.score}/10. ${data.feedback}</i></div>`;
+            }
+        };
+
+        function start() {
+            ws.send(JSON.stringify({ type: 'begin_interview' }));
+            document.getElementById('startBtn').style.display = 'none';
+        }
+
+        function send() {
+            const input = document.getElementById('answer');
+            chat.innerHTML += `<div class="msg user"><b>You:</b> ${input.value}</div>`;
+            ws.send(JSON.stringify({ type: 'send_answer', message: input.value }));
+            input.value = '';
+        }
+    </script>
+</body>
+</html>
