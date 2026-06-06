@@ -4,6 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
+from django.utils import timezone
 
 from .serializers import (
     RegisterSerializer,
@@ -21,10 +23,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-
-            # Generate tokens immediately after register
             refresh = RefreshToken.for_user(user)
-
             return Response({
                 'message': 'Account created successfully',
                 'user': {
@@ -32,16 +31,10 @@ class RegisterView(APIView):
                     'username': user.username,
                     'email': user.email,
                 },
-                'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
             }, status=status.HTTP_201_CREATED)
-
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginView(APIView):
@@ -57,7 +50,6 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Find user
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
@@ -66,7 +58,6 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Check password
         if not user.check_password(password):
             return Response(
                 {'error': 'Invalid credentials'},
@@ -79,9 +70,7 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Generate tokens
         refresh = RefreshToken.for_user(user)
-
         return Response({
             'message': 'Login successful',
             'user': {
@@ -91,10 +80,8 @@ class LoginView(APIView):
                 'target_role': user.target_role,
                 'profile_completed': user.profile_completed,
             },
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
         }, status=status.HTTP_200_OK)
 
 
@@ -136,7 +123,53 @@ class ProfileView(APIView):
                 'message': 'Profile updated successfully',
                 'user': UserProfileSerializer(request.user).data
             })
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProgressView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        from interviews.models import InterviewSession
+        sessions = InterviewSession.objects.filter(user=user)
+
+        total = sessions.count()
+
+        avg = sessions.aggregate(Avg('overall_score'))['overall_score__avg']
+        avg_score = round(avg) if avg else 0
+
+        this_month = sessions.filter(
+            started_at__month=timezone.now().month
+        ).count()
+
+        return Response({
+            'total_interviews': total,
+            'average_score': avg_score,
+            'streak': 0,
+            'improvement': 0,
+            'this_month': this_month,
+            'grade': 'A' if avg_score >= 80 else 'B',
+        })
+
+
+class ScoresView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from interviews.models import InterviewSession
+        sessions = InterviewSession.objects.filter(
+            user=request.user,
+            status='completed'
+        ).order_by('started_at')[:7]
+
+        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        data = []
+        for i, session in enumerate(sessions):
+            data.append({
+                'd': days[i % 7],
+                'score': session.overall_score or 0
+            })
+
+        return Response(data)
