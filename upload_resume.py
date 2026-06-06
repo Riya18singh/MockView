@@ -12,7 +12,7 @@ login_response = requests.post(
 )
 
 token = login_response.json()['tokens']['access']
-print(f"✅ Login successful")
+print(f" Login successful")
 print(f"Token: {token[:30]}...")
 
 headers = {'Authorization': f'Bearer {token}'}
@@ -27,7 +27,7 @@ with open('/home/myusername/Downloads/Riya_Resume.pdf', 'rb') as f:
         files={'resume': f}
     )
 
-print(f"\n✅ Resume Upload Status: {upload_response.status_code}")
+print(f"\n Resume Upload Status: {upload_response.status_code}")
 print(upload_response.json())
 
 # ─────────────────────────────
@@ -39,5 +39,5 @@ parse_response = requests.post(
     headers=headers
 )
 
-print(f"\n✅ Parse Status: {parse_response.status_code}")
+print(f"\n Parse Status: {parse_response.status_code}")
 print(f"Response text: {parse_response.text}")
